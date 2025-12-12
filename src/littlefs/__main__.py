@@ -1,13 +1,13 @@
 import argparse
-from contextlib import suppress
-from pathlib import Path
 import sys
 import textwrap
+from contextlib import suppress
+from pathlib import Path
 
 from littlefs import LittleFS, __version__
+from littlefs.context import UserContextFile
 from littlefs.errors import LittleFSError
 from littlefs.repl import LittleFSRepl
-from littlefs.context import UserContextFile
 
 # Dictionary mapping suffixes to their size in bytes
 _suffix_map = {
@@ -23,6 +23,7 @@ def _fs_from_args(args: argparse.Namespace, mount=True) -> LittleFS:
         block_count=getattr(args, "block_count", 0),
         name_max=args.name_max,
         mount=mount,
+        disk_version=args.disk_version,
     )
 
 
@@ -69,6 +70,7 @@ def create(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print(f"  Block Count: {args.block_count:9d}")
         print(f"  Name Max:    {args.name_max:9d}")
         print(f"  Image:       {args.destination}")
+        print(f"  Disk vers:   {args.disk_version}")
 
     source = Path(args.source).absolute()
     if source.is_dir():
@@ -259,11 +261,15 @@ def get_parser():
         help="LittleFS max file path length. Defaults to LittleFS's default (255).",
     )
 
-    subparsers = parser.add_subparsers(required=True, title="Available Commands", dest="command")
+    subparsers = parser.add_subparsers(
+        required=True, title="Available Commands", dest="command"
+    )
 
     def add_command(handler, name="", help=""):
         subparser = subparsers.add_parser(
-            name or handler.__name__, parents=[common_parser], help=help or handler.__doc__
+            name or handler.__name__,
+            parents=[common_parser],
+            help=help or handler.__doc__,
         )
         subparser.set_defaults(func=handler)
         return subparser
@@ -297,6 +303,14 @@ def get_parser():
         action="store_true",
         help="Do not pad the binary to-size with 0xFF. Only valid with --compact.",
     )
+    parser_create.add_argument(
+        "--disk-version",
+        type=int,
+        choices=[0, 131072],
+        default=1,
+        required=False,
+        help="File system version.",
+    )
     block_count_group = parser_create.add_mutually_exclusive_group(required=True)
     block_count_group.add_argument(
         "--block-count",
@@ -328,6 +342,14 @@ def get_parser():
         required=True,
         help="LittleFS block size.",
     )
+    parser_extract.add_argument(
+        "--disk-version",
+        type=int,
+        choices=[0, 131072],
+        default=1,
+        required=False,
+        help="File system version.",
+    )
 
     parser_list = add_command(_list, "list")
     parser_list.add_argument(
@@ -341,6 +363,14 @@ def get_parser():
         required=True,
         help="LittleFS block size.",
     )
+    parser_list.add_argument(
+        "--disk-version",
+        type=int,
+        choices=[0, 131072],
+        default=1,
+        required=False,
+        help="File system version.",
+    )
 
     parser_repl = add_command(repl)
     parser_repl.add_argument(
@@ -353,6 +383,14 @@ def get_parser():
         type=size_parser,
         required=True,
         help="LittleFS block size.",
+    )
+    parser_repl.add_argument(
+        "--disk-version",
+        type=int,
+        choices=[0, 131072],
+        default=1,
+        required=False,
+        help="File system version.",
     )
 
     return parser
